@@ -1,6 +1,6 @@
 resource "aws_vpc" "vpc" {
 
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
 
@@ -20,8 +20,8 @@ resource "aws_internet_gateway" "igw" {
 
 resource "aws_subnet" "subnet-public" {
   vpc_id     = aws_vpc.vpc.id
-  cidr_block = "10.0.1.0/24"
-  availability_zone = "us-east-1a"
+  cidr_block = var.public_subnet_cidr
+  availability_zone = var.availability_zone
   map_public_ip_on_launch = true
 
   tags = {
@@ -31,8 +31,8 @@ resource "aws_subnet" "subnet-public" {
 
 resource "aws_subnet" "private_subnet" {
   vpc_id = aws_vpc.vpc.id
-  cidr_block = "10.0.2.0/24"
-  availability_zone = "us-east-1a"
+  cidr_block = var.private_subnet_cidr
+  availability_zone = var.availability_zone
   map_public_ip_on_launch = false
   tags = {
     Name = "weather-private-subnet"
@@ -89,12 +89,12 @@ resource "aws_route_table_association" "private_rt_assoc" {
 }
 
 resource "tls_private_key" "ssh_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
+  algorithm = var.tls_algorithm
+  rsa_bits  = var.tls_rsa_bits
 }
 
 resource "local_file" "private_key" {
-  filename        = "weather-key.pem"
+  filename        = var.private_key_filename
   content         = tls_private_key.ssh_key.private_key_pem
   file_permission = "0400"
 }
@@ -164,9 +164,9 @@ resource "aws_instance" "bastion" {
   key_name = aws_key_pair.weather_key.key_name
   associate_public_ip_address = true
   root_block_device {
-  volume_size = 20
-  volume_type = "gp3"
-  encrypted   = true
+  volume_size = var.root_volume_size
+  volume_type = var.root_volume_type
+  encrypted   = var.root_volume_encrypted
   }
   tags = {
     Name = "weather-bastion"
@@ -183,9 +183,9 @@ resource "aws_instance" "master" {
   key_name = aws_key_pair.weather_key.key_name
   associate_public_ip_address = false
   root_block_device {
-  volume_size = 20
-  volume_type = "gp3"
-  encrypted   = true
+  volume_size = var.root_volume_size
+  volume_type = var.root_volume_type
+  encrypted   = var.root_volume_encrypted
   }
   tags = {
     Name = "k8s-master"
@@ -193,7 +193,7 @@ resource "aws_instance" "master" {
 }
 
 resource "aws_instance" "worker" {
-  count = 2
+  count = var.worker_count
   ami = var.ubuntu_ami
   instance_type = var.instance_type
   subnet_id = aws_subnet.private_subnet.id
@@ -202,9 +202,9 @@ resource "aws_instance" "worker" {
   ]
   key_name = aws_key_pair.weather_key.key_name
   root_block_device {
-  volume_size = 20
-  volume_type = "gp3"
-  encrypted   = true
+  volume_size = var.root_volume_size
+  volume_type = var.root_volume_type
+  encrypted   = var.root_volume_encrypted
   }
   tags = {
     Name = "k8s-worker-${count.index + 1}"

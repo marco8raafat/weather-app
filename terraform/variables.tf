@@ -25,3 +25,63 @@ variable "instance_type" {
 variable "availability_zone" {
   default = "us-east-1a"
 }
+
+variable "vpc_cidr" {
+  description = "CIDR block for VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "public_subnet_cidr" {
+  description = "CIDR block for public subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "private_subnet_cidr" {
+  description = "CIDR block for private subnet"
+  type        = string
+  default     = "10.0.2.0/24"
+}
+
+variable "worker_count" {
+  description = "Number of worker ec2s"
+  type        = number
+  default     = 2
+}
+
+variable "root_volume_size" {
+  description = "Root block device size in GB"
+  type        = number
+  default     = 20
+}
+
+variable "root_volume_type" {
+  description = "Root block device type"
+  type        = string
+  default     = "gp3"
+}
+
+variable "root_volume_encrypted" {
+  description = "Whether root volume should be encrypted"
+  type        = bool
+  default     = true
+}
+
+variable "private_key_filename" {
+  description = "Filename for the generated private key"
+  type        = string
+  default     = "weather-key.pem"
+}
+
+variable "tls_algorithm" {
+  description = "TLS private key algorithm"
+  type        = string
+  default     = "RSA"
+}
+
+variable "tls_rsa_bits" {
+  description = "RSA key size in bits"
+  type        = number
+  default     = 4096
+}
