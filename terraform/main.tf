@@ -1,212 +1,48 @@
-resource "aws_vpc" "vpc" {
+module "networking" {
+  source = "./modules/networking"
 
-  cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
-  tags = {
-    Name = "weather-vpc"
-  }
-
+  vpc_cidr            = var.vpc_cidr
+  public_subnet_cidr  = var.public_subnet_cidr
+  private_subnet_cidr = var.private_subnet_cidr
+  availability_zone   = var.availability_zone
+  name_prefix         = var.name_prefix
 }
 
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.vpc.id
+module "security" {
+  source = "./modules/security"
 
-  tags = {
-    Name = "weather-igw"
-  }
+  vpc_id        = module.networking.vpc_id
+  my_public_ip  = var.my_public_ip
+  bastion_sg_name = var.bastion_sg_name
+  kubernetes_sg_name = var.kubernetes_sg_name
 }
 
-resource "aws_subnet" "subnet-public" {
-  vpc_id     = aws_vpc.vpc.id
-  cidr_block = var.public_subnet_cidr
-  availability_zone = var.availability_zone
-  map_public_ip_on_launch = true
+module "compute" {
+  source = "./modules/compute"
 
-  tags = {
-    Name = "weather-subnet-public"
-  }
+  ubuntu_ami        = var.ubuntu_ami
+  instance_type     = var.instance_type
+  public_subnet_id  = module.networking.public_subnet_id
+  private_subnet_id = module.networking.private_subnet_id
+  bastion_sg_id     = module.security.bastion_sg_id
+  kubernetes_sg_id  = module.security.kubernetes_sg_id
+  key_name          = var.key_name
+  worker_count      = var.worker_count
+  root_volume_size  = var.root_volume_size
+  root_volume_type  = var.root_volume_type
+  root_volume_encrypted = var.root_volume_encrypted
+  private_key_filename = var.private_key_filename
+  tls_algorithm     = var.tls_algorithm
+  tls_rsa_bits      = var.tls_rsa_bits
+  name_prefix       = var.name_prefix
 }
 
-resource "aws_subnet" "private_subnet" {
-  vpc_id = aws_vpc.vpc.id
-  cidr_block = var.private_subnet_cidr
-  availability_zone = var.availability_zone
-  map_public_ip_on_launch = false
-  tags = {
-    Name = "weather-private-subnet"
-  }
-}
+module "ansible_inventory" {
+  source = "./modules/ansible-inventory"
 
-resource "aws_eip" "nat_eip" {
-  domain = "vpc"
-  tags = {
-    Name = "weather-nat-eip"
-  }
-}
-
-resource "aws_nat_gateway" "nat_gw" {
-  allocation_id = aws_eip.nat_eip.id
-  subnet_id     = aws_subnet.subnet-public.id
-
-  tags = {
-    Name = "weather-nat-gateway"
-  }
-  depends_on = [aws_internet_gateway.igw]
-}
-
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.vpc.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-  tags = {
-    Name = "weather-public-rt"
-  }
-}
-
-resource "aws_route_table" "private_rt" {
-  vpc_id = aws_vpc.vpc.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat_gw.id
-  }
-  tags = {
-    Name = "weather-private-rt"
-  }
-}
-
-resource "aws_route_table_association" "public_rt_assoc" {
-  subnet_id      = aws_subnet.subnet-public.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-resource "aws_route_table_association" "private_rt_assoc" {
-  subnet_id      = aws_subnet.private_subnet.id
-  route_table_id = aws_route_table.private_rt.id
-}
-
-resource "tls_private_key" "ssh_key" {
-  algorithm = var.tls_algorithm
-  rsa_bits  = var.tls_rsa_bits
-}
-
-resource "local_file" "private_key" {
-  filename        = var.private_key_filename
-  content         = tls_private_key.ssh_key.private_key_pem
-  file_permission = "0400"
-}
-
-resource "aws_key_pair" "weather_key" {
-  key_name   = var.key_name
-  public_key = tls_private_key.ssh_key.public_key_openssh
-}
-
-resource "aws_security_group" "bastion_sg" {
-  name   = "bastion-sg"
-  vpc_id = aws_vpc.vpc.id
-  ingress {
-    description = "SSH"
-    from_port = 22
-    to_port   = 22
-    protocol = "tcp"
-    cidr_blocks = [var.my_public_ip]
-  }
-  egress {
-    from_port = 0
-    to_port   = 0
-    protocol = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_security_group" "kubernetes_sg" {
-
-  name   = "k8s-sg"
-  vpc_id = aws_vpc.vpc.id
-
-  # SSH from Bastion
-  ingress {
-    description     = "SSH from Bastion"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.bastion_sg.id]
-  }
-
-  # Allow all communication between Kubernetes nodes
-  ingress {
-    description = "Internal Kubernetes Communication"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    self        = true
-  }
-
-  # Outbound
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_instance" "bastion" {
-  ami = var.ubuntu_ami
-  instance_type = var.instance_type
-  subnet_id = aws_subnet.subnet-public.id
-  vpc_security_group_ids = [
-    aws_security_group.bastion_sg.id
-  ]
-  key_name = aws_key_pair.weather_key.key_name
-  associate_public_ip_address = true
-  root_block_device {
-  volume_size = var.root_volume_size
-  volume_type = var.root_volume_type
-  encrypted   = var.root_volume_encrypted
-  }
-  tags = {
-    Name = "weather-bastion"
-  }
-}
-
-resource "aws_instance" "master" {
-  ami = var.ubuntu_ami
-  instance_type = var.instance_type
-  subnet_id = aws_subnet.private_subnet.id
-  vpc_security_group_ids = [
-    aws_security_group.kubernetes_sg.id
-  ]
-  key_name = aws_key_pair.weather_key.key_name
-  associate_public_ip_address = false
-  root_block_device {
-  volume_size = var.root_volume_size
-  volume_type = var.root_volume_type
-  encrypted   = var.root_volume_encrypted
-  }
-  tags = {
-    Name = "k8s-master"
-  }
-}
-
-resource "aws_instance" "worker" {
-  count = var.worker_count
-  ami = var.ubuntu_ami
-  instance_type = var.instance_type
-  subnet_id = aws_subnet.private_subnet.id
-  vpc_security_group_ids = [
-    aws_security_group.kubernetes_sg.id
-  ]
-  key_name = aws_key_pair.weather_key.key_name
-  root_block_device {
-  volume_size = var.root_volume_size
-  volume_type = var.root_volume_type
-  encrypted   = var.root_volume_encrypted
-  }
-  tags = {
-    Name = "k8s-worker-${count.index + 1}"
-  }
+  bastion_public_ip = module.compute.bastion_public_ip
+  master_private_ip = module.compute.master_private_ip
+  worker_private_ips = module.compute.worker_private_ips
+  private_key_path  = module.compute.private_key_path
+  inventory_path    = var.inventory_path
 }
