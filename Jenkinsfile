@@ -46,6 +46,17 @@ pipeline {
             }
         }
 
+        stage('Kubernetes Deploy') {
+
+            steps {
+
+                kubernetesDeploy()
+
+            }
+        }
+
+
 
     }
+
 }
