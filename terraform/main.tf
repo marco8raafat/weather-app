@@ -31,9 +31,6 @@ module "compute" {
   root_volume_size  = var.root_volume_size
   root_volume_type  = var.root_volume_type
   root_volume_encrypted = var.root_volume_encrypted
-  private_key_filename = var.private_key_filename
-  tls_algorithm     = var.tls_algorithm
-  tls_rsa_bits      = var.tls_rsa_bits
   name_prefix       = var.name_prefix
 }
 
@@ -43,6 +40,6 @@ module "ansible_inventory" {
   bastion_public_ip = module.compute.bastion_public_ip
   master_private_ip = module.compute.master_private_ip
   worker_private_ips = module.compute.worker_private_ips
-  private_key_path  = module.compute.private_key_path
+  private_key_path  = var.private_key_path
   inventory_path    = var.inventory_path
 }

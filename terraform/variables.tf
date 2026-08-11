@@ -68,12 +68,6 @@ variable "root_volume_encrypted" {
   default     = true
 }
 
-variable "private_key_filename" {
-  description = "Filename for the generated private key"
-  type        = string
-  default     = "weather-key.pem"
-}
-
 variable "tls_algorithm" {
   description = "TLS private key algorithm"
   type        = string
@@ -84,6 +78,12 @@ variable "tls_rsa_bits" {
   description = "RSA key size in bits"
   type        = number
   default     = 4096
+}
+
+variable "private_key_path" {
+  description = "Path to the existing private key file for SSH access"
+  type        = string
+  default     = "~/.ssh/ansible-key.pem"
 }
 
 variable "name_prefix" {

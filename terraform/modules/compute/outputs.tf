@@ -9,7 +9,3 @@ output "master_private_ip" {
 output "worker_private_ips" {
   value = aws_instance.worker[*].private_ip
 }
-
-output "private_key_path" {
-  value = local_file.private_key.filename
-}

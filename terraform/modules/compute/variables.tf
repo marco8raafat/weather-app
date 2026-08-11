@@ -47,11 +47,6 @@ variable "root_volume_encrypted" {
   default = true
 }
 
-variable "private_key_filename" {
-  type    = string
-  default = "weather-key.pem"
-}
-
 variable "tls_algorithm" {
   type    = string
   default = "RSA"
