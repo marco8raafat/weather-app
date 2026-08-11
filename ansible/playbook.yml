@@ -181,109 +181,63 @@
 # RUN FROM MASTER AFTER WORKERS HAVE JOINED
 # =========================================================
 
-- name: Install NGINX Ingress Controller from master
-  hosts: master
+- name: Add ingress-nginx Helm repository
   become: true
+  become_user: ubuntu
+  ansible.builtin.command:
+    cmd: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
 
-  tasks:
+- name: Update Helm repositories
+  become: true
+  become_user: ubuntu
+  ansible.builtin.command:
+    cmd: helm repo update
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
 
-    # -----------------------------------------------------
-    # 1. Wait until all Kubernetes nodes are Ready
-    # -----------------------------------------------------
+- name: Create ingress-nginx namespace
+  become: true
+  become_user: ubuntu
+  ansible.builtin.command:
+    cmd: kubectl create namespace ingress-nginx
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: namespace_result
+  failed_when:
+    - namespace_result.rc != 0
+    - "'AlreadyExists' not in namespace_result.stderr"
 
-    - name: Wait until all nodes are present and Ready
-      become_user: ubuntu
-      shell: |
-        expected={{ groups['master'] | length + groups['workers'] | length }}
+- name: Install NGINX Ingress Controller
+  become: true
+  become_user: ubuntu
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx
+      --namespace ingress-nginx
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
 
-        count=$(kubectl get nodes \
-          --kubeconfig=/home/ubuntu/.kube/config \
-          -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
-          | grep -c True || true)
+- name: Wait for NGINX Ingress Controller to be ready
+  become: true
+  become_user: ubuntu
+  ansible.builtin.command:
+    cmd: kubectl rollout status deployment/ingress-nginx-controller
+      -n ingress-nginx
+      --timeout=300s
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
 
-        if [ "$count" -ge "$expected" ]; then
-          exit 0
-        else
-          exit 1
-        fi
-      register: wait_nodes
-      retries: 30
-      delay: 10
-      until: wait_nodes.rc == 0
+- name: Verify NGINX Ingress Controller
+  become: true
+  become_user: ubuntu
+  ansible.builtin.command:
+    cmd: kubectl get pods -n ingress-nginx
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: ingress_pods
 
-    # -----------------------------------------------------
-    # 2. Add ingress-nginx Helm repository
-    # -----------------------------------------------------
-
-    - name: Add ingress-nginx Helm repository
-      become_user: ubuntu
-      command: >
-        helm repo add ingress-nginx
-        https://kubernetes.github.io/ingress-nginx
-
-    # -----------------------------------------------------
-    # 3. Update Helm repository
-    # -----------------------------------------------------
-
-    - name: Update Helm repositories
-      become_user: ubuntu
-      command: helm repo update
-
-    # -----------------------------------------------------
-    # 4. Install NGINX Ingress Controller using Helm
-    # -----------------------------------------------------
-
-    - name: Install NGINX Ingress Controller
-      become_user: ubuntu
-      command: >
-        helm install ingress-nginx ingress-nginx/ingress-nginx
-        --namespace ingress-nginx
-        --create-namespace
-        --set controller.service.type=NodePort
-        --set controller.service.nodePorts.http=30080
-        --set controller.service.nodePorts.https=30443
-      environment:
-        KUBECONFIG: /home/ubuntu/.kube/config
-
-    # -----------------------------------------------------
-    # 5. Wait for NGINX Ingress Controller
-    # -----------------------------------------------------
-
-    - name: Wait for NGINX ingress controller deployment to be ready
-      become_user: ubuntu
-      command: >
-        kubectl -n ingress-nginx rollout status
-        deployment/ingress-nginx-controller
-        --timeout=300s
-      environment:
-        KUBECONFIG: /home/ubuntu/.kube/config
-
-    # -----------------------------------------------------
-    # 6. Verify Ingress Controller
-    # -----------------------------------------------------
-
-    - name: Get NGINX Ingress Controller pods
-      become_user: ubuntu
-      command: kubectl get pods -n ingress-nginx
-      environment:
-        KUBECONFIG: /home/ubuntu/.kube/config
-      register: ingress_pods
-
-    - name: Display NGINX Ingress Controller pods
-      debug:
-        var: ingress_pods.stdout
-
-    # -----------------------------------------------------
-    # 7. Verify Ingress Service
-    # -----------------------------------------------------
-
-    - name: Get NGINX Ingress Controller service
-      become_user: ubuntu
-      command: kubectl get svc -n ingress-nginx
-      environment:
-        KUBECONFIG: /home/ubuntu/.kube/config
-      register: ingress_service
-
-    - name: Display NGINX Ingress Controller service
-      debug:
-        var: ingress_service.stdout
+- name: Show NGINX Ingress Controller pods
+  ansible.builtin.debug:
+    var: ingress_pods.stdout
