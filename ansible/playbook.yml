@@ -174,3 +174,35 @@
       command: sh /tmp/join-command.sh
       args:
         creates: /etc/kubernetes/kubelet.conf
+
+
+# =========================================================
+# PLAY D - Install Ingress Controller, RUN FROM MASTER after workers joined
+# =========================================================
+- name: Install Ingress Controller from master after workers joined
+  hosts: master
+  become: true
+  tasks:
+
+    - name: Wait until all nodes are present and Ready
+      become_user: ubuntu
+      shell: |
+        expected={{ groups['master'] | length + groups['workers'] | length }}
+        count=$(kubectl get nodes -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' --kubeconfig=/home/ubuntu/.kube/config | grep -c True || true)
+        if [ "$count" -ge "$expected" ]; then exit 0; else exit 1; fi
+      register: wait_nodes
+      retries: 30
+      delay: 10
+      until: wait_nodes.rc == 0
+
+    - name: Install NGINX Ingress Controller
+      become_user: ubuntu
+      command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
+
+    - name: Wait for NGINX ingress controller deployment to be ready
+      become_user: ubuntu
+      command: kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller --timeout=300s
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
