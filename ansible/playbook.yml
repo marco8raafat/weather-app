@@ -181,63 +181,51 @@
 # RUN FROM MASTER AFTER WORKERS HAVE JOINED
 # =========================================================
 
-- name: Add ingress-nginx Helm repository
-  become: true
-  become_user: ubuntu
-  ansible.builtin.command:
-    cmd: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
-
-- name: Update Helm repositories
-  become: true
-  become_user: ubuntu
-  ansible.builtin.command:
-    cmd: helm repo update
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
-
-- name: Create ingress-nginx namespace
-  become: true
-  become_user: ubuntu
-  ansible.builtin.command:
-    cmd: kubectl create namespace ingress-nginx
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
-  register: namespace_result
-  failed_when:
-    - namespace_result.rc != 0
-    - "'AlreadyExists' not in namespace_result.stderr"
-
+---
 - name: Install NGINX Ingress Controller
+  hosts: master
   become: true
   become_user: ubuntu
-  ansible.builtin.command:
-    cmd: >
-      helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx
-      --namespace ingress-nginx
+
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
 
-- name: Wait for NGINX Ingress Controller to be ready
-  become: true
-  become_user: ubuntu
-  ansible.builtin.command:
-    cmd: kubectl rollout status deployment/ingress-nginx-controller
-      -n ingress-nginx
-      --timeout=300s
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
+  tasks:
 
-- name: Verify NGINX Ingress Controller
-  become: true
-  become_user: ubuntu
-  ansible.builtin.command:
-    cmd: kubectl get pods -n ingress-nginx
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
-  register: ingress_pods
+    - name: Add ingress-nginx Helm repository
+      ansible.builtin.command:
+        cmd: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      register: helm_repo
+      changed_when: "'already exists' not in (helm_repo.stderr | lower)"
 
-- name: Show NGINX Ingress Controller pods
-  ansible.builtin.debug:
-    var: ingress_pods.stdout
+    - name: Update Helm repositories
+      ansible.builtin.command:
+        cmd: helm repo update
+      changed_when: false
+
+    - name: Install NGINX Ingress Controller
+      ansible.builtin.command:
+        cmd: >
+          helm upgrade --install ingress-nginx
+          ingress-nginx/ingress-nginx
+          --namespace ingress-nginx
+          --create-namespace
+
+    - name: Wait for NGINX Ingress Controller
+      ansible.builtin.command:
+        cmd: >
+          kubectl rollout status
+          deployment/ingress-nginx-controller
+          -n ingress-nginx
+          --timeout=300s
+      changed_when: false
+
+    - name: Verify NGINX Ingress Controller
+      ansible.builtin.command:
+        cmd: kubectl get pods -n ingress-nginx -o wide
+      register: ingress_pods
+      changed_when: false
+
+    - name: Display ingress pods
+      ansible.builtin.debug:
+        var: ingress_pods.stdout_lines
