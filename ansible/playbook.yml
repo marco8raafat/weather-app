@@ -1,4 +1,4 @@
----
+
 # =========================================================
 # PLAY A - Common setup, runs on ALL nodes (master + workers)
 # =========================================================
@@ -181,7 +181,6 @@
 # RUN FROM MASTER AFTER WORKERS HAVE JOINED
 # =========================================================
 
----
 - name: Install NGINX Ingress Controller
   hosts: master
   become: true
