@@ -197,7 +197,7 @@
 
     - name: Install NGINX Ingress Controller
       become_user: ubuntu
-      command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+      command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/baremetal/deploy.yaml
       environment:
         KUBECONFIG: /home/ubuntu/.kube/config
 
