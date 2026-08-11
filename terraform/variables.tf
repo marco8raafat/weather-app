@@ -85,3 +85,27 @@ variable "tls_rsa_bits" {
   type        = number
   default     = 4096
 }
+
+variable "name_prefix" {
+  description = "Prefix for all created AWS resources"
+  type        = string
+  default     = "weather"
+}
+
+variable "bastion_sg_name" {
+  description = "Name for the bastion security group"
+  type        = string
+  default     = "weather-bastion-sg"
+}
+
+variable "kubernetes_sg_name" {
+  description = "Name for the Kubernetes security group"
+  type        = string
+  default     = "weather-kubernetes-sg"
+}
+
+variable "inventory_path" {
+  description = "Path where the generated Ansible inventory file will be written"
+  type        = string
+  default     = "../ansible/inventory/inventory.ini"
+}
