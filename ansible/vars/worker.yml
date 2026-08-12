@@ -1,0 +1,3 @@
+---
+join_command_path: /tmp/join-command.sh
+kubelet_conf_path: /etc/kubernetes/kubelet.conf

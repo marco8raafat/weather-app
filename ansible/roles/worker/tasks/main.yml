@@ -1,0 +1,20 @@
+---
+- name: Fetch join command from master
+  ansible.builtin.fetch:
+    src: "{{ join_command_path }}"
+    dest: "{{ join_command_path }}"
+    flat: true
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+
+- name: Copy join command to workers
+  ansible.builtin.copy:
+    src: "{{ join_command_path }}"
+    dest: "{{ join_command_path }}"
+    mode: '0755'
+
+- name: Run kubeadm join
+  ansible.builtin.command:
+    cmd: "sh {{ join_command_path }}"
+  args:
+    creates: "{{ kubelet_conf_path }}"

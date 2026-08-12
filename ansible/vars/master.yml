@@ -1,0 +1,18 @@
+---
+kube_pod_network_cidr: 192.168.0.0/16
+kubeconfig_user: ubuntu
+kubeconfig_home: /home/ubuntu
+kubeadm_admin_conf: /etc/kubernetes/admin.conf
+calico_manifest_url: https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+join_command_path: /tmp/join-command.sh
+
+helm_install_script_url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+helm_install_script_dest: /tmp/get_helm.sh
+helm_binary: /usr/local/bin/helm
+ingress_repo_name: ingress-nginx
+ingress_repo_url: https://kubernetes.github.io/ingress-nginx
+ingress_release_name: ingress-nginx
+ingress_chart: ingress-nginx/ingress-nginx
+ingress_namespace: ingress-nginx
+ingress_controller_deployment: ingress-nginx-controller
+ingress_rollout_timeout: 300s

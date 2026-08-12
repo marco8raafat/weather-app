@@ -1,0 +1,107 @@
+---
+- name: Check Kubernetes cluster
+  ansible.builtin.command:
+    cmd: kubectl get nodes
+  register: kubectl_nodes
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig_home }}/.kube/config"
+
+- name: Display Kubernetes nodes
+  ansible.builtin.debug:
+    var: kubectl_nodes.stdout_lines
+
+- name: Download Helm installation script
+  ansible.builtin.get_url:
+    url: "{{ helm_install_script_url }}"
+    dest: "{{ helm_install_script_dest }}"
+    mode: '0755'
+
+- name: Install Helm
+  ansible.builtin.command:
+    cmd: "{{ helm_install_script_dest }}"
+  args:
+    creates: "{{ helm_binary }}"
+
+- name: Verify Helm installation
+  ansible.builtin.command:
+    cmd: "{{ helm_binary }} version"
+  register: helm_version
+  changed_when: false
+
+- name: Display Helm version
+  ansible.builtin.debug:
+    var: helm_version.stdout
+
+- name: Add ingress-nginx Helm repository
+  ansible.builtin.command:
+    cmd: "{{ helm_binary }} repo add {{ ingress_repo_name }} {{ ingress_repo_url }}"
+  register: helm_repo
+  changed_when: >
+    'already exists' not in (helm_repo.stdout | lower)
+    and 'already exists' not in (helm_repo.stderr | lower)
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: "{{ helm_binary }} repo update"
+  changed_when: false
+
+- name: Install NGINX Ingress Controller
+  ansible.builtin.command:
+    cmd: >
+      {{ helm_binary }} upgrade --install {{ ingress_release_name }}
+      {{ ingress_chart }}
+      --namespace {{ ingress_namespace }}
+      --create-namespace
+  register: ingress_install
+
+- name: Display ingress installation result
+  ansible.builtin.debug:
+    var: ingress_install.stdout_lines
+
+- name: Wait for NGINX Ingress Controller
+  ansible.builtin.command:
+    cmd: >
+      kubectl rollout status
+      deployment/{{ ingress_controller_deployment }}
+      -n {{ ingress_namespace }}
+      --timeout={{ ingress_rollout_timeout }}
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig_home }}/.kube/config"
+
+- name: Get ingress-nginx pods
+  ansible.builtin.command:
+    cmd: "kubectl get pods -n {{ ingress_namespace }} -o wide"
+  register: ingress_pods
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig_home }}/.kube/config"
+
+- name: Display ingress-nginx pods
+  ansible.builtin.debug:
+    var: ingress_pods.stdout_lines
+
+- name: Get ingress-nginx services
+  ansible.builtin.command:
+    cmd: "kubectl get svc -n {{ ingress_namespace }}"
+  register: ingress_services
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig_home }}/.kube/config"
+
+- name: Display ingress-nginx services
+  ansible.builtin.debug:
+    var: ingress_services.stdout_lines
+
+- name: Get IngressClass
+  ansible.builtin.command:
+    cmd: kubectl get ingressclass
+  register: ingress_class
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig_home }}/.kube/config"
+
+- name: Display IngressClass
+  ansible.builtin.debug:
+    var: ingress_class.stdout_lines

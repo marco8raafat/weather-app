@@ -1,0 +1,93 @@
+---
+- name: Disable swap
+  ansible.builtin.command:
+    cmd: swapoff -a
+  changed_when: false
+
+- name: Remove swap entry from /etc/fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Load required kernel modules
+  ansible.builtin.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ kernel_modules }}"
+
+- name: Persist kernel modules on boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      {% for module in kernel_modules %}
+      {{ module }}
+      {% endfor %}
+
+- name: Set required sysctl params for Kubernetes networking
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      {% for key, value in sysctl_settings.items() %}
+      {{ key }} = {{ value }}
+      {% endfor %}
+
+- name: Apply sysctl params
+  ansible.builtin.command:
+    cmd: sysctl --system
+  changed_when: false
+
+- name: Install containerd and dependencies
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+    update_cache: true
+
+- name: Create containerd config directory
+  ansible.builtin.file:
+    path: "{{ containerd_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Generate default containerd config
+  ansible.builtin.shell: "{{ containerd_config_default_command }}"
+  args:
+    creates: "{{ containerd_config_file }}"
+
+- name: Enable SystemdCgroup in containerd config
+  ansible.builtin.replace:
+    path: "{{ containerd_config_file }}"
+    regexp: 'SystemdCgroup\s*=\s*false'
+    replace: 'SystemdCgroup = true'
+
+- name: Restart and enable containerd
+  ansible.builtin.systemd:
+    name: "{{ containerd_service }}"
+    state: restarted
+    enabled: true
+
+- name: Add Kubernetes apt signing key
+  ansible.builtin.get_url:
+    url: "{{ kubernetes_apt_key_url }}"
+    dest: "{{ kubernetes_apt_key_dest }}"
+    mode: '0644'
+
+- name: Add Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: "{{ kubernetes_apt_repo }}"
+    state: present
+    filename: kubernetes
+
+- name: Install kubelet, kubeadm, kubectl
+  ansible.builtin.apt:
+    name: "{{ kubernetes_packages }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages at current version
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ kubernetes_packages }}"
