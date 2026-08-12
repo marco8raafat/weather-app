@@ -192,9 +192,9 @@
 
   tasks:
 
-    # ==========================================================
+    # =========================================================
     # 1. Check Kubernetes access
-    # ==========================================================
+    # =========================================================
 
     - name: Check Kubernetes cluster
       ansible.builtin.command:
@@ -206,17 +206,16 @@
       ansible.builtin.debug:
         var: kubectl_nodes.stdout_lines
 
-
-    # ==========================================================
+    # =========================================================
     # 2. Install Helm
-    # ==========================================================
+    # =========================================================
 
     - name: Download Helm installation script
       become_user: root
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
         dest: /tmp/get_helm.sh
-        mode: '0755'
+        mode: "0755"
 
     - name: Install Helm
       become_user: root
@@ -236,51 +235,54 @@
       ansible.builtin.debug:
         var: helm_version.stdout
 
-
-    # ==========================================================
+    # =========================================================
     # 3. Add NGINX Ingress Helm repository
-    # ==========================================================
+    # =========================================================
 
     - name: Add ingress-nginx Helm repository
+      become_user: ubuntu
       ansible.builtin.command:
-        cmd: /usr/local/bin/helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        cmd: >
+          /usr/local/bin/helm repo add ingress-nginx
+          https://kubernetes.github.io/ingress-nginx
       register: helm_repo
       changed_when: >
         'already exists' not in (helm_repo.stdout | lower)
         and 'already exists' not in (helm_repo.stderr | lower)
 
-
-    # ==========================================================
+    # =========================================================
     # 4. Update Helm repositories
-    # ==========================================================
+    # =========================================================
 
     - name: Update Helm repositories
+      become_user: ubuntu
       ansible.builtin.command:
         cmd: /usr/local/bin/helm repo update
       changed_when: false
 
-
-    # ==========================================================
+    # =========================================================
     # 5. Install NGINX Ingress Controller
-    # ==========================================================
+    # =========================================================
 
     - name: Install NGINX Ingress Controller
+      become_user: ubuntu
       ansible.builtin.command:
         cmd: >
           /usr/local/bin/helm upgrade --install ingress-nginx
           ingress-nginx/ingress-nginx
           --namespace ingress-nginx
           --create-namespace
+          --set controller.service.type=NodePort
+          --set controller.service.nodePorts.http=30001
       register: ingress_install
 
     - name: Display ingress installation result
       ansible.builtin.debug:
         var: ingress_install.stdout_lines
 
-
-    # ==========================================================
+    # =========================================================
     # 6. Wait for Ingress Controller
-    # ==========================================================
+    # =========================================================
 
     - name: Wait for NGINX Ingress Controller
       ansible.builtin.command:
@@ -291,10 +293,9 @@
           --timeout=300s
       changed_when: false
 
-
-    # ==========================================================
+    # =========================================================
     # 7. Verify Ingress Controller Pods
-    # ==========================================================
+    # =========================================================
 
     - name: Get ingress-nginx pods
       ansible.builtin.command:
@@ -306,10 +307,9 @@
       ansible.builtin.debug:
         var: ingress_pods.stdout_lines
 
-
-    # ==========================================================
+    # =========================================================
     # 8. Verify Ingress Controller Service
-    # ==========================================================
+    # =========================================================
 
     - name: Get ingress-nginx services
       ansible.builtin.command:
@@ -321,10 +321,9 @@
       ansible.builtin.debug:
         var: ingress_services.stdout_lines
 
-
-    # ==========================================================
+    # =========================================================
     # 9. Verify IngressClass
-    # ==========================================================
+    # =========================================================
 
     - name: Get IngressClass
       ansible.builtin.command:
