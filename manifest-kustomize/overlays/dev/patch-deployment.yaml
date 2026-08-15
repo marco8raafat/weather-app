@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-app          # Must match the target Deployment's name exactly for the patch to apply
+spec:
+  replicas: 1                # Overrides base's replicas:2 → dev only runs 1 pod
+  template:
+    spec:
+      containers:
+        - name: weather-app          # Must match the container name in base to merge correctly
+          resources:
+            requests:
+              cpu: "50m"              # Lower CPU request than base (100m) — dev needs fewer guaranteed resources
+              memory: "64Mi"          # Lower memory request than base (128Mi)
+            limits:
+              cpu: "250m"             # Lower CPU cap than base (500m)
+              memory: "256Mi"         # Lower memory cap than base (512Mi)
