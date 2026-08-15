@@ -7,5 +7,9 @@ resources:
   - service.yaml
   - ingress.yaml
 
-commonLabels:
-  app: weather-app
+  
+labels:
+  - pairs:
+      app: weather-app
+    includeSelectors: true
+

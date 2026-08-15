@@ -16,5 +16,7 @@ images:
   - name: mennatallah2001/weather-app:lates  # Find any container using this image name
     newTag: "1.0.0"                          # ...and set/override its tag to 1.0.0
 
-commonLabels:
-  env: dev                    # Adds an extra label env=dev to every resource in this overlay
+labels:
+  - pairs:
+      env: dev
+    includeSelectors: false               

@@ -1,15 +1,22 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: prod
+namespace: weather-app        # Forces every resource pulled in to live in this namespace (redundant safeguard here since base already sets it, but keeps overlay self-contained)
 
 resources:
-  - ../../base
-  - namespace.yaml
+  - ../../base                # Pull in everything defined by the base kustomization
 
-commonLabels:
-  environment: prod
-  
 patches:
-  - path: replica-patch.yaml
-  - path: ingress-patch.yaml
+  - path: patch-deployment.yaml   # Apply this strategic-merge patch file...
+    target:
+      kind: Deployment               # ...to the object of kind Deployment...
+      name: weather-app              # ...named "weather-app"
+
+images:
+  - name: mennatallah2001/weather-app:lates  # Find any container using this image name
+    newTag: "1.0.0"                          # ...and set/override its tag to 1.0.0
+          
+labels:
+  - pairs:
+      env: prod
+    includeSelectors: false
